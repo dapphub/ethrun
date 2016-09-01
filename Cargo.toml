@@ -1,0 +1,27 @@
+[package]
+description = "Quick test runner"
+name = "parity-quickrun"
+version = "0.0.1"
+license = "GPL-3.0"
+authors = ["Mikael Brockman <mikael@brockman.se>"]
+
+[dependencies]
+rustc-serialize = "0.3"
+docopt = "0.6"
+serde = "0.7.9"
+serde_json = "0.7.1"
+ethcore = { git = "https://github.com/ethcore/parity" }
+ethcore-util = { git = "https://github.com/ethcore/parity" }
+ethcore-devtools = { git = "https://github.com/ethcore/parity" }
+ethcore-io = { git = "https://github.com/ethcore/parity" }
+ethcore-logger = { git = "https://github.com/ethcore/parity" }
+ethstore = { git = "https://github.com/ethcore/parity" }
+regex = "0.1"
+lazy_static = "0.2.1"
+
+[dependencies.ethabi]
+git = "https://github.com/ethcore/ethabi"
+
+[[bin]]
+path = "main.rs"
+name = "parity-quickrun"
