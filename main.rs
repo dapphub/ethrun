@@ -102,43 +102,14 @@ fn fixup_contract_types(value: json::Value) -> json::Value {
   }
 }
 
-struct Runner {
-  client: Arc<Client>,
-  engine: Arc<Engine + 'static>,
+struct Runner<'a> {
+  client: &'a Client,
+  engine: &'a Engine,
   account: util::H160,
   secret: util::H256
 }
 
-impl Runner {
-  fn new(spec: Spec) -> Runner {
-    let temp = RandomTempPath::new();
-    let path = temp.as_path();
-  
-    let miner = Arc::new(Miner::with_spec(&spec));
-    let client = Client::new(
-      ClientConfig::default(),
-      &spec,
-      &path,
-      miner,
-      IoChannel::disconnected()
-    ).unwrap();
-  
-    let secret = Secret::from_str(
-      "a100df7a048e50ed308ea696dc600215098141cb391e9527329df289f9383f65"
-    ).unwrap();
-  
-    let account_provider = AccountProvider::transient_provider();
-    let account = account_provider.insert_account(secret.clone(), "").unwrap();
-    account_provider.unlock_account_permanently(account, "".to_string()).unwrap();
-  
-    Runner {
-      client: client,
-      engine: spec.engine,
-      account: account,
-      secret: secret
-    }
-  }
-
+impl<'a> Runner<'a> {
   fn execute(&self, transaction: Transaction) {
     let mut block = self.client.prepare_open_block(
       self.account,
@@ -286,7 +257,33 @@ fn run() {
   //     }
   //   ).collect();
 
-  let runner = Runner::new(Spec::load(include_bytes!("./chain.json")));
+  let temp = RandomTempPath::new();
+  let path = temp.as_path();
+  let spec = Spec::load(include_bytes!("./chain.json"));
+
+  let miner = Arc::new(Miner::with_spec(&spec));
+  let client = Client::new(
+    ClientConfig::default(),
+    &spec,
+    &path,
+    miner,
+    IoChannel::disconnected()
+  ).unwrap();
+
+  let secret = Secret::from_str(
+    "a100df7a048e50ed308ea696dc600215098141cb391e9527329df289f9383f65"
+  ).unwrap();
+
+  let account_provider = AccountProvider::transient_provider();
+  let account = account_provider.insert_account(secret.clone(), "").unwrap();
+  account_provider.unlock_account_permanently(account, "".to_string()).unwrap();
+
+  let runner = Runner {
+    client: &client,
+    engine: &*spec.engine,
+    account: account,
+    secret: secret
+  };
 
   for func in abi_tests {
     let x = run_test(&runner, &code, &abi_setup, &abi_failed, &func);
