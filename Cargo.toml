@@ -1,6 +1,6 @@
 [package]
 description = "Quick test runner"
-name = "parity-quickrun"
+name = "quickrun"
 version = "0.0.1"
 license = "GPL-3.0"
 authors = ["Mikael Brockman <mikael@brockman.se>"]
@@ -24,4 +24,4 @@ git = "https://github.com/ethcore/ethabi"
 
 [[bin]]
 path = "main.rs"
-name = "parity-quickrun"
+name = "quickrun"
