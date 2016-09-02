@@ -32,6 +32,8 @@ extern crate ethcore_logger as logger;
 extern crate ethstore;
 extern crate ethabi as abi;
 
+extern crate tiny_keccak as keccak;
+
 use regex::Regex;
 
 use devtools::RandomTempPath;
@@ -62,15 +64,17 @@ Expects output from `solc --combined-json=abi,bin` on stdin.
 Test suite should be compatible with Dapple's test framework.
 
 Usage:
-  quickrun --test-contract=<contract>
+  quickrun --test-contract=<contract> [options]
 
 Options:
+  --logs              Print log entries
   -h --help           Show this screen
 "#;
 
 #[derive(Debug, RustcDecodable)]
 struct Args {
-  pub flag_test_contract: String
+  pub flag_test_contract: String,
+  pub flag_logs: bool,
 }
 
 // A bug in Solidity gives stuff like { "type": "MyContract"} for event fields.
@@ -279,23 +283,39 @@ fn run() -> Result<(), String> {
       }
     ).collect();
 
-  // let abi_events: Vec<(&str, abi::Event)> =
-  //   abi_value.as_array().unwrap().iter().filter_map(|x|
-  //     match *(x.find("type").unwrap()) {
-  //       json::Value::String(ref t) if t == "event" => {
-  //         let name = x.find("name").unwrap().as_string().unwrap();
-  //         Some((
-  //           name,
-  //           abi::Event::new(
-  //             abi.event(
-  //               name.to_string()
-  //             ).unwrap()
-  //           )
-  //         ))
-  //       },
-  //       _ => None
-  //     }
-  //   ).collect();
+  let abi_events: Vec<(&str, Vec<u8>, abi::Event)> =
+    abi_value.as_array().unwrap().iter().filter_map(|x|
+      match *(x.find("type").unwrap()) {
+        json::Value::String(ref t) if t == "event" => {
+          let name = x.find("name").unwrap().as_string().unwrap();
+
+          let inputs = x.find("inputs").unwrap().as_array().unwrap().iter()
+            .map(|x| x.find("type").unwrap().as_string().unwrap().to_string())
+            .collect::<Vec<String>>()
+            .join(",");
+
+          // XXX: clarify what's going on, refactor
+          // SHA3("MyEvent(uint,address)")
+          let mut sponge = keccak::Keccak::new_keccak256();
+          let mut hash = [0u8; 4];
+          sponge.update(
+            format!("{}({})", name, inputs).as_bytes()
+          );
+          sponge.finalize(&mut hash);
+          
+          Some((
+            name,
+            hash.to_vec(),
+            abi::Event::new(
+              abi.event(
+                name.to_string()
+              ).unwrap()
+            )
+          ))
+        },
+        _ => None
+      }
+    ).collect();
 
   let temp = RandomTempPath::new();
   let path = temp.as_path();
@@ -336,17 +356,23 @@ fn run() -> Result<(), String> {
           logs.len()
         );
 
-        // // There seems to be something wrong with how ethabi decodes events,
-        // // like it doesn't consider the event name or something?
-        // for log in logs {
-        //   let topics: Vec<[u8; 32]> = log.topics.iter().map(|h| h.0).collect();
-        //   match abi_events.iter().filter_map(|&(name, ref e)|
-        //     e.decode_log(topics.clone(), log.data.clone()).ok().map(|d| (name, d))
-        //   ).next() {
-        //     Some(decoded) => println!("{:?}", decoded),
-        //     _ => println!("unknown event")
-        //   }
-        // }
+        if args.flag_logs {
+          for log in logs {
+            let topics: Vec<[u8; 32]> = log.topics.iter().map(|h| h.0).collect();
+            let interface_topic = log.topics.get(0).unwrap().0[0..4].to_vec();
+            match abi_events.iter().filter_map(|&(name, ref hash, ref e)| {
+              if *hash == interface_topic {
+                e.decode_log(topics.clone(), log.data.clone()).ok().map(|d| (name, d))
+              } else {
+                None
+              }
+            }).next() {
+              Some((name, decoded)) => println!("{} {:?}", name, decoded.params),
+              _ => println!("unknown event")
+            }
+          }
+          println!("");
+        }
       },
       Err(e) =>
         println!("FAIL {:?}", e),
