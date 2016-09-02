@@ -17,7 +17,7 @@
 
 #[macro_use] extern crate lazy_static;
 
-// extern crate docopt;
+extern crate docopt;
 
 extern crate serde_json as json;
 extern crate rustc_serialize;
@@ -54,21 +54,24 @@ use util::{U256, FromHex, Uint};
 use std::str::FromStr;
 use std::sync::Arc;
 
-// const USAGE: &'static str = r#"
-// Quick contract runner
-// Usage:
-//   parity-quickrun
+const USAGE: &'static str = r#"
+Quick Ethereum unit test runner based on the Ethcore platform.
 
-// Options:
-//   -h --help           Show this screen
-// "#;
+Expects output from `solc --combined-json=abi,bin` on stdin.
 
-// #[derive(Debug, RustcDecodable)]
-// struct Args {
-// }
+Test suite should be compatible with Dapple's test framework.
 
-// impl Args {
-// }
+Usage:
+  quickrun --test-contract=<contract>
+
+Options:
+  -h --help           Show this screen
+"#;
+
+#[derive(Debug, RustcDecodable)]
+struct Args {
+  pub flag_test_contract: String
+}
 
 // A bug in Solidity gives stuff like { "type": "MyContract"} for event fields.
 // We must transform them to "address" ourselves until this is fixed in solc.
@@ -182,10 +185,16 @@ impl<'a> Runner<'a> {
 }
 
 fn main() {
-  run();
+  match run() {
+    Ok(_) => {},
+    Err(e) => {
+      println!("error: {}", e);
+      std::process::exit(1)
+    }
+  }
 }
 
-fn run() {
+fn run() -> Result<(), String> {
   let log_config = logger::Config {
     mode: None,
     color: true,
@@ -194,33 +203,65 @@ fn run() {
   
   logger::setup_log(&log_config).unwrap();
 
-  // docopt::Docopt::new(USAGE).and_then(|d| d.decode())
-  //   .unwrap_or_else(|e| e.exit());
+  let args: Args = docopt::Docopt::new(USAGE).and_then(|d| d.decode())
+    .unwrap_or_else(|e| e.exit());
 
-  let x: json::Value = json::from_reader(
-    std::io::stdin()
-  ).unwrap();
+  let x: json::Value = try!(
+    json::from_reader(std::io::stdin()).or(Err("invalid JSON on stdin"))
+  );
 
-  let root = x.as_object().unwrap();
-  let bin_hex = root.get("bin").unwrap().as_string().unwrap();
-  let code = bin_hex.to_string().from_hex().ok().unwrap();
+  let root: &json::Value = try!(
+    try!(x.find("contracts").ok_or(
+      "no `contracts` field; is stdin data from solc --combined-json?"
+    )).find(&args.flag_test_contract).ok_or(
+      format!("contract {} not found", args.flag_test_contract)
+    )
+  );
   
-  let abi_json = root.get("abi").unwrap().as_string().unwrap();
-  let abi_value: json::Value = json::from_str(abi_json).unwrap();
+  let bin_hex = try!(
+    try!(
+      root.find("bin").ok_or("no `bin` field in contract JSON")
+    ).as_string().ok_or("`bin` field was not a string")
+  );
+  
+  let code = try!(
+    bin_hex.to_string().from_hex().or(Err("`code` field was not valid hex"))
+  );
+  
+  let abi_json = try!(
+    try!(
+      root.find("abi").ok_or("no `abi` field in contract JSON")
+    ).as_string().ok_or("`abi` field was not a string")
+  );
+  
+  let abi_value: json::Value = try!(
+    json::from_str(abi_json).map_err(|e|
+      format!("error decoding `abi` field as JSON: {}", e)
+    )
+  );
+  
   let abi_fixed = fixup_contract_types(abi_value.clone());
 
   let abi_fixed_json = json::to_string(&abi_fixed).unwrap();
-  let abi: abi::Interface = abi::Interface::load(
-    abi_fixed_json.as_bytes()
-  ).unwrap();
+  let abi: abi::Interface = try!(
+    abi::Interface::load(abi_fixed_json.as_bytes()).map_err(|e|
+      format!("error parsing ABI: {:?}", e)
+    )
+  );
 
-  let abi_failed = abi.function("failed".to_string()).unwrap();
+  let abi_failed = try!(
+    abi.function("failed".to_string()).ok_or(
+      "ABI has no `failed` method; is it a Dapple test?"
+    )
+  );
+  
   let abi_setup = abi.function("setUp".to_string());
 
   lazy_static! {
     static ref TEST_PATTERN: Regex = Regex::new("^test").unwrap();
   }
 
+  // Assumes the ABI JSON is correct since ethabi was able to parse it.
   let abi_tests: Vec<abi::spec::Function> =
     abi_value.as_array().unwrap().iter().filter_map(|x|
       match *(x.find("type").unwrap()) {
@@ -311,6 +352,8 @@ fn run() {
         println!("FAIL {:?}", e),
     }
   }
+
+  Ok(())
 }
 
 fn run_test(

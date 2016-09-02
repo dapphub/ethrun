@@ -1,5 +1,5 @@
 [root]
-name = "parity-quickrun"
+name = "quickrun"
 version = "0.0.1"
 dependencies = [
  "docopt 0.6.83 (registry+https://github.com/rust-lang/crates.io-index)",
