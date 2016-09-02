@@ -197,10 +197,6 @@ impl<'a> Runner<'a> {
   fn fake_sign(&self, transaction: Transaction) -> SignedTransaction {
     transaction.fake_sign(self.account)
   }
-
-  fn traces_for_latest_block(&self) -> Option<Vec<ethcore::trace::LocalizedTrace>> {
-    self.client.block_traces(BlockID::Pending)
-  }
 }
 
 fn main() {
@@ -337,8 +333,6 @@ fn run() -> Result<(), String> {
   let spec = Spec::load(include_bytes!("./chain.json"));
 
   let miner = Arc::new(Miner::with_spec(&spec));
-  let mut config = ClientConfig::default();
-  config.tracing.enabled = ethcore::trace::Switch::On;
   let client = Client::new(
     ClientConfig::default(),
     &spec,
@@ -423,7 +417,6 @@ fn run_test(
 
   runner.transient_call(contract, spec).map(|result| {
     runner.execute_call(contract, spec);
-    println!("{:?}", runner.traces_for_latest_block());
     let failed = runner.transient_call(contract, abi_failed).unwrap().output;
     (failed.last() == Some(&1), result)
   })
