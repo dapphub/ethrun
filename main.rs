@@ -68,6 +68,9 @@ Usage:
 
 Options:
   --logs              Print log entries
+  --trace             Print "externals" trace
+  --vmtrace           Print VM trace
+  --diff              Print state diffs
   -h --help           Show this screen
 "#;
 
@@ -75,6 +78,9 @@ Options:
 struct Args {
   pub flag_test_contract: String,
   pub flag_logs: bool,
+  pub flag_trace: bool,
+  pub flag_vmtrace: bool,
+  pub flag_diff: bool,
 }
 
 // A bug in Solidity gives stuff like { "type": "MyContract"} for event fields.
@@ -163,6 +169,11 @@ impl<'a> Runner<'a> {
   fn transient_call(&self, contract: util::H160, spec: &abi::spec::Function)
     -> Result<ethcore::client::Executed, ethcore::error::CallError>
   {
+    let analytics = ethcore::client::CallAnalytics {
+      transaction_tracing: true,
+      vm_tracing: true,
+      state_diffing: true,
+    };
     self.client.call(&self.fake_sign(Transaction {
       nonce: self.latest_nonce(util::Address::default()),
       action: Action::Call(contract),
@@ -170,7 +181,7 @@ impl<'a> Runner<'a> {
       gas_price: U256::default(),
       value: U256::default(),
       data: abi::Function::new(spec.clone()).encode_call(vec![]).unwrap()
-    }), BlockID::Latest, Default::default())
+    }), BlockID::Latest, analytics)
   }
 
   fn next_contract_address(&self) -> util::H160 {
@@ -185,6 +196,10 @@ impl<'a> Runner<'a> {
 
   fn fake_sign(&self, transaction: Transaction) -> SignedTransaction {
     transaction.fake_sign(self.account)
+  }
+
+  fn traces_for_latest_block(&self) -> Option<Vec<ethcore::trace::LocalizedTrace>> {
+    self.client.block_traces(BlockID::Pending)
   }
 }
 
@@ -322,6 +337,8 @@ fn run() -> Result<(), String> {
   let spec = Spec::load(include_bytes!("./chain.json"));
 
   let miner = Arc::new(Miner::with_spec(&spec));
+  let mut config = ClientConfig::default();
+  config.tracing.enabled = ethcore::trace::Switch::On;
   let client = Client::new(
     ClientConfig::default(),
     &spec,
@@ -348,13 +365,23 @@ fn run() -> Result<(), String> {
   for func in abi_tests {
     let x = run_test(&runner, &code, &abi_setup, &abi_failed, &func);
     match x {
-      Ok((failed, Executed { logs, .. })) => {
+      Ok((failed, Executed { logs, trace, vm_trace, state_diff, .. })) => {
         println!(
           "{} {} ({} logs)",
           if failed { "FAIL" } else {"OK  "},
           func.name,
           logs.len()
         );
+
+        if args.flag_trace {
+          println!("TRACE {:?}\n", trace);
+        }
+        if args.flag_vmtrace {
+          println!("VMTRACE {:?}\n", vm_trace);
+        }
+        if args.flag_diff {
+          println!("STATEDIFF {:?}\n", state_diff);
+        }
 
         if args.flag_logs {
           for log in logs {
@@ -396,6 +423,7 @@ fn run_test(
 
   runner.transient_call(contract, spec).map(|result| {
     runner.execute_call(contract, spec);
+    println!("{:?}", runner.traces_for_latest_block());
     let failed = runner.transient_call(contract, abi_failed).unwrap().output;
     (failed.last() == Some(&1), result)
   })
