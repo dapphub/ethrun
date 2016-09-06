@@ -71,6 +71,7 @@ Options:
   --trace             Print "externals" trace
   --vmtrace           Print VM trace
   --diff              Print state diffs
+  --json              Use JSON output format
   -h --help           Show this screen
 "#;
 
@@ -81,6 +82,7 @@ struct Args {
   pub flag_trace: bool,
   pub flag_vmtrace: bool,
   pub flag_diff: bool,
+  pub flag_json: bool,
 }
 
 // A bug in Solidity gives stuff like { "type": "MyContract"} for event fields.
@@ -356,48 +358,104 @@ fn run() -> Result<(), String> {
     secret: secret
   };
 
+  let mut json_array = vec![];
+
   for func in abi_tests {
     let x = run_test(&runner, &code, &abi_setup, &abi_failed, &func);
     match x {
       Ok((failed, Executed { logs, trace, vm_trace, state_diff, .. })) => {
-        println!(
-          "{} {} ({} logs)",
-          if failed { "FAIL" } else {"OK  "},
-          func.name,
-          logs.len()
-        );
+        let mut json_keys = std::collections::BTreeMap::new();
 
-        if args.flag_trace {
-          println!("TRACE {:?}\n", trace);
+        if args.flag_json {
+          json_keys.insert("name".to_string(), json::Value::String(func.name));
+          json_keys.insert("ok".to_string(), json::Value::Bool(!failed));
+          if args.flag_trace {
+            json_keys.insert("trace".to_string(),
+              json::Value::String(format!("{:?}", trace)));
+          }
+          if args.flag_vmtrace {
+            json_keys.insert("vmtrace".to_string(),
+              json::Value::String(format!("{:?}", vm_trace)));
+          }
+          if args.flag_diff {
+            json_keys.insert("diff".to_string(),
+              json::Value::String(format!("{:?}", state_diff)));
+          }
+        } else {
+          println!(
+            "{} {} ({} logs)",
+            if failed { "FAIL" } else {"OK  "},
+            func.name,
+            logs.len()
+          );
+  
+          if args.flag_trace {
+            println!("TRACE {:?}\n", trace);
+          }
+          if args.flag_vmtrace {
+            println!("VMTRACE {:?}\n", vm_trace);
+          }
+          if args.flag_diff {
+            println!("STATEDIFF {:?}\n", state_diff);
+          }
         }
-        if args.flag_vmtrace {
-          println!("VMTRACE {:?}\n", vm_trace);
-        }
-        if args.flag_diff {
-          println!("STATEDIFF {:?}\n", state_diff);
-        }
-
-        if args.flag_logs {
-          for log in logs {
+        
+        if args.flag_logs  {
+          let decoded_logs = logs.iter().map(|log| {
             let topics: Vec<[u8; 32]> = log.topics.iter().map(|h| h.0).collect();
             let interface_topic = log.topics.get(0).unwrap().0[0..4].to_vec();
-            match abi_events.iter().filter_map(|&(name, ref hash, ref e)| {
+            abi_events.iter().filter_map(|&(name, ref hash, ref e)| {
               if *hash == interface_topic {
-                e.decode_log(topics.clone(), log.data.clone()).ok().map(|d| (name, d))
+                e.decode_log(
+                  topics.clone(), log.data.clone()
+                ).ok().map(|d| (name, d.params))
               } else {
                 None
               }
-            }).next() {
-              Some((name, decoded)) => println!("{} {:?}", name, decoded.params),
-              _ => println!("unknown event")
+            }).next()
+          });
+
+          if args.flag_json {
+            json_keys.insert(
+              "logs".to_string(),
+              json::Value::Array(decoded_logs.map(|x|
+                match x {
+                  Some((name, d)) => {
+                    let mut log_keys = std::collections::BTreeMap::new();
+                    log_keys.insert(
+                      "name".to_string(), json::Value::String(name.to_string())
+                    );
+                    log_keys.insert(
+                      "log".to_string(), json::Value::String(format!("{:?}", d))
+                    );
+                    json::Value::Object(log_keys)
+                  },
+                  None => json::Value::Null
+                }
+              ).collect())
+            );
+          } else {
+            for decoded_log in decoded_logs {
+              match decoded_log {
+                Some((name, d)) => println!("{} {:?}", name, d),
+                None => ()
+              }
             }
+            println!("");
           }
-          println!("");
+        }
+
+        if args.flag_json {
+          json_array.push(json::Value::Object(json_keys));
         }
       },
       Err(e) =>
         println!("FAIL {:?}", e),
     }
+  }
+
+  if args.flag_json {
+    println!("{}", json::Value::Array(json_array));
   }
 
   Ok(())
