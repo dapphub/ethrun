@@ -65,6 +65,7 @@ Test suite should be compatible with Dapple's test framework.
 
 Usage:
   quickrun --test-contract=<contract> [options]
+  quickrun --list-contracts
 
 Options:
   --logs              Print log entries
@@ -77,6 +78,7 @@ Options:
 
 #[derive(Debug, RustcDecodable)]
 struct Args {
+  pub flag_list_contracts: bool,
   pub flag_test_contract: String,
   pub flag_logs: bool,
   pub flag_trace: bool,
@@ -227,10 +229,19 @@ fn run() -> Result<(), String> {
     json::from_reader(std::io::stdin()).or(Err("invalid JSON on stdin"))
   );
 
-  let root: &json::Value = try!(
-    try!(x.find("contracts").ok_or(
+  let contracts: &json::Value = try!(x.find("contracts").ok_or(
       "no `contracts` field; is stdin data from solc --combined-json?"
-    )).find(&args.flag_test_contract).ok_or(
+  ));
+  
+  if args.flag_list_contracts {
+    for c in contracts.as_object().unwrap().keys() {
+      println!("{}", c);
+    }
+    return Ok(());
+  }
+
+  let root: &json::Value = try!(
+    contracts.find(&args.flag_test_contract).ok_or(
       format!("contract {} not found", args.flag_test_contract)
     )
   );
