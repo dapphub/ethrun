@@ -9,6 +9,7 @@ dependencies = [
  "ethcore-io 1.4.0 (git+https://github.com/ethcore/parity)",
  "ethcore-logger 1.4.0 (git+https://github.com/ethcore/parity)",
  "ethcore-util 1.4.0 (git+https://github.com/ethcore/parity)",
+ "ethjson 0.1.0 (git+https://github.com/ethcore/parity)",
  "ethstore 0.1.0 (git+https://github.com/ethcore/parity)",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "regex 0.1.73 (registry+https://github.com/rust-lang/crates.io-index)",

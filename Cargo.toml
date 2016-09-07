@@ -16,6 +16,7 @@ ethcore-devtools = { git = "https://github.com/ethcore/parity" }
 ethcore-io = { git = "https://github.com/ethcore/parity" }
 ethcore-logger = { git = "https://github.com/ethcore/parity" }
 ethstore = { git = "https://github.com/ethcore/parity" }
+ethjson = { git = "https://github.com/ethcore/parity" }
 regex = "0.1"
 lazy_static = "0.2.1"
 tiny-keccak = "1.1"

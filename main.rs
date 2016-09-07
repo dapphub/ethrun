@@ -31,6 +31,7 @@ extern crate ethcore_logger as logger;
 
 extern crate ethstore;
 extern crate ethabi as abi;
+extern crate ethjson;
 
 extern crate tiny_keccak as keccak;
 
@@ -437,11 +438,16 @@ fn run() -> Result<(), String> {
                       "name".to_string(), json::Value::String(name.to_string())
                     );
                     log_keys.insert(
-                      "log".to_string(), json::Value::String(format!("{:?}", d))
+                      "params".to_string(),
+                      params_to_json(&d)
                     );
                     json::Value::Object(log_keys)
                   },
-                  None => json::Value::Null
+                  None => {
+                    let mut log_keys = std::collections::BTreeMap::new();
+                    log_keys.insert("name".to_string(), json::Value::Null);
+                    json::Value::Object(log_keys)
+                  }
                 }
               ).collect())
             );
@@ -489,4 +495,18 @@ fn run_test(
     let failed = runner.transient_call(contract, abi_failed).unwrap().output;
     (failed.last() == Some(&1), result)
   })
+}
+
+fn params_to_json(
+  params: &Vec<(String, abi::spec::ParamType, abi::Token)>
+) -> json::Value {
+  let mut array = vec![];
+  for (name, paramtype, token) in params.clone() {
+    let mut keys = std::collections::BTreeMap::new();
+    keys.insert("name".to_string(), json::Value::String(name));
+    keys.insert("type".to_string(), json::Value::String(format!("{}", paramtype)));
+    keys.insert("value".to_string(), json::Value::String(format!("{}", token)));
+    array.push(json::Value::Object(keys));
+  }
+  json::Value::Array(array)
 }
