@@ -402,7 +402,7 @@ fn run() -> Result<(), String> {
           );
   
           if args.flag_trace {
-            println!("TRACE {:?}\n", trace);
+            println!("TRACE {} {:?}\n", trace.len(), trace);
           }
           if args.flag_vmtrace {
             println!("VMTRACE {:?}\n", vm_trace);
@@ -466,8 +466,9 @@ fn run() -> Result<(), String> {
           json_array.push(json::Value::Object(json_keys));
         }
       },
-      Err(e) =>
-        println!("FAIL {:?}", e),
+      Err(e) => {
+        println!("FAIL {:?}", e)
+      }
     }
   }
 
