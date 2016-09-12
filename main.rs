@@ -384,10 +384,11 @@ fn run() -> Result<(), String> {
       Ok((failed, Executed { logs, trace, vm_trace, state_diff, .. })) => {
         let mut json_keys = std::collections::BTreeMap::new();
 
-        let ok = !failed && (match trace[0].result {
-          FailedCall => SHOULD_FAIL_PATTERN.is_match(&func.name),
-          _ => true
-        });
+        let should_fail = SHOULD_FAIL_PATTERN.is_match(&func.name);
+        let ok = !failed && match trace[0].result {
+          FailedCall => should_fail,
+          _ => !should_fail
+        };
 
         if args.flag_json {
           json_keys.insert("name".to_string(), json::Value::String(func.name));
