@@ -47,6 +47,7 @@ use ethcore::client::Executed;
 use ethcore::engines::Engine;
 use ethcore::spec::Spec;
 use ethcore::miner::Miner;
+use ethcore::trace::trace::Res::FailedCall;
 
 use ethstore::ethkey::Secret;
 
@@ -372,15 +373,25 @@ fn run() -> Result<(), String> {
 
   let mut json_array = vec![];
 
+  lazy_static! {
+    static ref SHOULD_FAIL_PATTERN: Regex =
+      Regex::new("^test(Throw|Fail|Error)").unwrap();
+  }
+
   for func in abi_tests {
     let x = run_test(&runner, &code, &abi_setup, &abi_failed, &func);
     match x {
       Ok((failed, Executed { logs, trace, vm_trace, state_diff, .. })) => {
         let mut json_keys = std::collections::BTreeMap::new();
 
+        let ok = !failed && (match trace[0].result {
+          FailedCall => SHOULD_FAIL_PATTERN.is_match(&func.name),
+          _ => true
+        });
+
         if args.flag_json {
           json_keys.insert("name".to_string(), json::Value::String(func.name));
-          json_keys.insert("ok".to_string(), json::Value::Bool(!failed));
+          json_keys.insert("ok".to_string(), json::Value::Bool(ok));
           if args.flag_trace {
             json_keys.insert("trace".to_string(),
               json::Value::String(format!("{:?}", trace)));
@@ -396,7 +407,7 @@ fn run() -> Result<(), String> {
         } else {
           println!(
             "{} {} ({} logs)",
-            if failed { "FAIL" } else {"OK  "},
+            if !ok { "FAIL" } else {"OK  "},
             func.name,
             logs.len()
           );
@@ -467,7 +478,15 @@ fn run() -> Result<(), String> {
         }
       },
       Err(e) => {
-        println!("FAIL {:?}", e)
+        let mut json_keys = std::collections::BTreeMap::new();
+
+        if args.flag_json {
+          json_keys.insert("name".to_string(), json::Value::String(func.name));
+          json_keys.insert("ok".to_string(), json::Value::Bool(false));
+          json_keys.insert("error".to_string(), json::Value::String(format!("{}", e)));
+        } else { 
+          println!("FAIL {:?}", e)
+        }
       }
     }
   }
