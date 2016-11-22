@@ -1,29 +1,21 @@
 [package]
-description = "Quick test runner"
-name = "quickrun"
-version = "0.0.1"
+name = "ethrun"
+description = "Ethereum bytecode runner"
+version = "0.0.0"
 license = "GPL-3.0"
-authors = ["Mikael Brockman <mikael@brockman.se>"]
+authors = [
+  "Daniel Brockman <daniel@brockman.se>",
+  "Mikael Brockman <mikael@brockman.se>",
+]
 
 [dependencies]
-rustc-serialize = "0.3"
-docopt = "0.6"
-serde = "0.7.9"
-serde_json = "0.7.1"
-ethcore = { git = "https://github.com/ethcore/parity" }
-ethcore-util = { git = "https://github.com/ethcore/parity" }
+ethcore          = { git = "https://github.com/ethcore/parity" }
+ethcore-util     = { git = "https://github.com/ethcore/parity" }
 ethcore-devtools = { git = "https://github.com/ethcore/parity" }
-ethcore-io = { git = "https://github.com/ethcore/parity" }
-ethcore-logger = { git = "https://github.com/ethcore/parity" }
-ethstore = { git = "https://github.com/ethcore/parity" }
-ethjson = { git = "https://github.com/ethcore/parity" }
-regex = "0.1"
-lazy_static = "0.2.1"
-tiny-keccak = "1.1"
-
-[dependencies.ethabi]
-git = "https://github.com/ethcore/ethabi"
+ethcore-io       = { git = "https://github.com/ethcore/parity" }
+ethcore-logger   = { git = "https://github.com/ethcore/parity" }
+ethstore         = { git = "https://github.com/ethcore/parity" }
 
 [[bin]]
-path = "main.rs"
-name = "quickrun"
+path = "ethrun.rs"
+name = "ethrun"
