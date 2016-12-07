@@ -1,21 +1,18 @@
 [package]
+name        = "ethrun"
+description = "Directly run EVM bytecode using Parity"
+version     = "0.0.0"
+license     = "GPL-3.0"
+
+[[bin]]
 name = "ethrun"
-description = "Ethereum bytecode runner"
-version = "0.0.0"
-license = "GPL-3.0"
-authors = [
-  "Daniel Brockman <daniel@brockman.se>",
-  "Mikael Brockman <mikael@brockman.se>",
-]
+path = "ethrun.rs"
 
 [dependencies]
 ethcore          = { git = "https://github.com/ethcore/parity" }
-ethcore-util     = { git = "https://github.com/ethcore/parity" }
 ethcore-devtools = { git = "https://github.com/ethcore/parity" }
 ethcore-io       = { git = "https://github.com/ethcore/parity" }
-ethcore-logger   = { git = "https://github.com/ethcore/parity" }
-ethstore         = { git = "https://github.com/ethcore/parity" }
-
-[[bin]]
-path = "ethrun.rs"
-name = "ethrun"
+ethcore-util     = { git = "https://github.com/ethcore/parity" }
+ethkey           = { git = "https://github.com/ethcore/parity" }
+rustc-serialize  = "0.3"
+serde_json       = "0.8"

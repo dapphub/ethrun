@@ -1,0 +1,49 @@
+ETHRUN(1)               Nexus Development Tools                ETHRUN(1)
+
+
+NAME
+	ethrun - directly run EVM bytecode
+SYNOPSIS
+        echo <bytecode> | ethrun [<calldata>...]
+
+DESCRIPTION
+	Ethrun sets up a minimal Parity environment, deploys one
+	contract, sends zero or more transactions to it and then
+	prints the result to standard output as a JSON structure.
+
+OUTPUT
+        Ethrun outputs a JSON array in which the outcome of each
+        transaction is represented like in the following example:
+
+	   [{
+             "success": true,
+             "output": "",
+             "logs": [],
+	   }, {
+             "success": true,
+             "output": "0000000000000000...0000000000000001",
+             "logs": [{
+               "address": "5185630e41e8b32...c87aa735a24f3f6",
+               "data": "0000000000000000...0000000032a0ead3",
+               "topics": [
+                 "6ee2ab87ef1bfa44...e959a6b0a190be6c",
+                 "0000000000000000...0000000000000000"
+               ],
+             }],
+	   }]
+
+	The first element of the array always represents the
+	transaction in which the contract is first deployed.
+
+INSTALLATION
+	Use `make link' to install from source:
+
+	   git clone https://github.com/nexusdev/ethrun
+	   make link -C ethrun
+
+SEE ALSO
+	parity(1), ethabi(1), dapple-quicktest(1)
+
+
+
+ETHRUN(1)                    December 2016                     ETHRUN(1)
