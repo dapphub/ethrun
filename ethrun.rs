@@ -15,11 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see https://www.gnu.org/licenses.
 
-/// Commentary:
-
-// This program is intended to be used as a low-level building block
-// for higher-level applications (such as running EVM-based tests).
-
 extern crate ethcore;
 extern crate ethcore_devtools;
 extern crate ethcore_io;
@@ -27,6 +22,7 @@ extern crate ethcore_util;
 extern crate ethkey;
 extern crate rustc_serialize;
 extern crate serde_json as json;
+// extern crate ethcore_rpc;
 
 use ethcore::client::BlockChainClient;
 use ethcore::client::MiningBlockChainClient;
@@ -37,18 +33,14 @@ use std::io::Read;
 use std::sync::Arc;
 
 fn main() {
-  // Parity comes with a default consensus-free mining setup
   let mut genesis = ethcore::spec::Spec::new_instant();
 
-  // The secret of the default account is the empty brainwallet
   let account = ethkey::KeyPair::from_secret(ethkey::Secret::from(
     "4d5db4107d237df6a3d58ee5f70ae63d73d7658d4026f2eefd2f204c81682cb7"
   )).unwrap();
 
-  // We need a large gas limit so we can run large contracts
   genesis.gas_limit = U256::from("ffffffffffffffffffff");
 
-  // Create a standard temporary blockchain client
   let client = ethcore::client::Client::new(
     ethcore::client::ClientConfig::default(), &genesis,
     &ethcore_devtools::RandomTempPath::new().as_path(),
@@ -57,16 +49,13 @@ fn main() {
     &ethcore_util::DatabaseConfig::with_columns(ethcore::db::NUM_COLUMNS),
   ).unwrap();
 
-  // For now, all our transactions go in a single block
   let mut block = client.prepare_open_block(
     account.address(), (0.into(), 1.into()), vec![]
   );
 
-  // The bytecode to be deployed comes from standard input
   let mut input = String::new();
   std::io::stdin().read_to_string(&mut input).unwrap();
 
-  // Deploy the bytecode to the address of the first nonce
   let nonce = client.latest_nonce(&account.address());
   let contract = ethcore::contract_address(&account.address(), &nonce);
   block.push_transaction(ethcore::transaction::Transaction {
@@ -78,7 +67,6 @@ fn main() {
     nonce     : nonce,
   }.sign(&account.secret(), None), None).unwrap();
 
-  // Push one additional transaction for each command line argument
   for (i, calldata) in std::env::args().skip(1).enumerate() {
     block.push_transaction(ethcore::transaction::Transaction {
       action    : ethcore::transaction::Action::Call(contract),
@@ -90,12 +78,10 @@ fn main() {
     }.sign(&account.secret(), None), None).unwrap();
   }
 
-  // Seal the block in order to be able to replay the transactions
   client.import_sealed_block(
     block.close_and_lock().seal(&*genesis.engine, vec![]).unwrap()
   ).unwrap();
 
-  // Replaying the transactions lets us extract results from them
   println!("{}", json::Value::Array((0 .. std::env::args().len()).map(|i| {
     match client.replay(
       ethcore::client::TransactionID::Location(
@@ -116,6 +102,126 @@ fn main() {
             ethcore::trace::trace::Res::FailedCall(_) => false,
             _ => true,
           }),
+        );
+
+        fields.insert(
+          "trace".to_string(),
+          json::Value::Array(trace.iter().map(|item| {
+            let mut fields = json::Map::new();
+
+            fields.insert("action".to_string(), {
+              let mut fields = json::Map::new();
+
+              match item.action {
+                ethcore::trace::trace::Action::Create(
+                  ethcore::trace::trace::Create {
+                    from, value, ref init, ..
+                  }
+                ) => {
+                  fields.insert("type".to_string(), {
+                    json::Value::String("create".to_string())
+                  });
+                  fields.insert("from".to_string(), {
+                    json::Value::String(from.to_vec().to_hex())
+                  });
+                  fields.insert("value".to_string(), {
+                    json::Value::String(value.to_string())
+                  });
+                  fields.insert("init".to_string(), {
+                    json::Value::String(init.to_vec().to_hex())
+                  });
+                }
+                ethcore::trace::trace::Action::Call(
+                  ethcore::trace::trace::Call {
+                    from, to, value, ref input, ref call_type, ..
+                  }
+                ) => {
+                  fields.insert("type".to_string(), {
+                    json::Value::String("call".to_string())
+                  });
+                  fields.insert("from".to_string(), {
+                    json::Value::String(from.to_vec().to_hex())
+                  });
+                  fields.insert("to".to_string(), {
+                    json::Value::String(to.to_vec().to_hex())
+                  });
+                  fields.insert("value".to_string(), {
+                    json::Value::String(value.to_string())
+                  });
+                  fields.insert("input".to_string(), {
+                    json::Value::String(input.to_vec().to_hex())
+                  });
+                  fields.insert("call_type".to_string(), {
+                    json::Value::String(format!("{:?}", call_type))
+                  });
+                }
+                ethcore::trace::trace::Action::Suicide(_) => {
+                  fields.insert("type".to_string(), {
+                    json::Value::String("suicide".to_string())
+                  });
+                }
+              };
+
+              json::Value::Object(fields)
+            });
+
+            fields.insert("result".to_string(), {
+              let mut fields = json::Map::new();
+
+              match item.result {
+                ethcore::trace::trace::Res::Create(
+                  ethcore::trace::trace::CreateResult {
+                    address, ref code, ..
+                  }
+                ) => {
+                  fields.insert("address".to_string(), {
+                    json::Value::String(address.to_hex().to_string())
+                  });
+                  fields.insert("code".to_string(), {
+                    json::Value::String(code.to_vec().to_hex().to_string())
+                  });
+                }
+                ethcore::trace::trace::Res::Call(
+                  ethcore::trace::trace::CallResult { ref output, .. }
+                ) => {
+                  fields.insert("output".to_string(), {
+                    json::Value::String(output.to_hex().to_string())
+                  });
+                }
+                ethcore::trace::trace::Res::FailedCall(ref error) => {
+                  fields.insert("error".to_string(), {
+                    json::Value::String(format!("{:?}", error))
+                  });
+                }
+                ethcore::trace::trace::Res::FailedCreate(ref error) => {
+                  fields.insert("error".to_string(), {
+                    json::Value::String(format!("{:?}", error))
+                  });
+                }
+                ethcore::trace::trace::Res::None => {
+                  fields.insert("error".to_string(), {
+                    json::Value::String("(none)".to_string())
+                  });
+                }
+              }
+
+              json::Value::Object(fields)
+            });
+
+            fields.insert(
+              "subtraces".to_string(),
+              json::Value::String(item.subtraces.to_string()),
+            );
+
+            fields.insert(
+              "trace_address".to_string(),
+              json::Value::Array(item.trace_address.iter().map(
+                |x| json::Value::String(x.to_string())
+              ).collect()),
+            );
+
+            json::Value::Object(fields)
+          }).collect())
         );
 
         fields.insert(
