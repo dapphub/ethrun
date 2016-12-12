@@ -42,44 +42,47 @@ fn main() {
   genesis.gas_limit = U256::from("ffffffffffffffffffff");
 
   let client = ethcore::client::Client::new(
-    ethcore::client::ClientConfig::default(), &genesis,
+    ethcore::client::ClientConfig::default(),
+    &genesis,
     &ethcore_devtools::RandomTempPath::new().as_path(),
     Arc::new(ethcore::miner::Miner::with_spec(&genesis)),
     ethcore_io::IoChannel::disconnected(),
     &ethcore_util::DatabaseConfig::with_columns(ethcore::db::NUM_COLUMNS),
   ).unwrap();
 
+  let block_author = account.address();
+  let gas_range_target = (0.into(), 1.into());
+  let extra_data = vec![];
   let mut block = client.prepare_open_block(
-    account.address(), (0.into(), 1.into()), vec![]
+    block_author, gas_range_target, extra_data
   );
 
-  let mut input = String::new();
-  std::io::stdin().read_to_string(&mut input).unwrap();
+  let create_nonce = client.latest_nonce(&account.address());
+  let address = ethcore::contract_address(&account.address(), &create_nonce);
 
-  let nonce = client.latest_nonce(&account.address());
-  let contract = ethcore::contract_address(&account.address(), &nonce);
   block.push_transaction(ethcore::transaction::Transaction {
     action    : ethcore::transaction::Action::Create,
-    data      : input.from_hex().unwrap(),
+    data      : read_stdin().from_hex().unwrap(),
     value     : U256::from("ffffffffffffffffffffffff"),
     gas       : U256::from("ffffffffffff"),
     gas_price : U256::from(0),
-    nonce     : nonce,
+    nonce     : create_nonce,
   }.sign(&account.secret(), None), None).unwrap();
 
   for (i, calldata) in std::env::args().skip(1).enumerate() {
     block.push_transaction(ethcore::transaction::Transaction {
-      action    : ethcore::transaction::Action::Call(contract),
+      action    : ethcore::transaction::Action::Call(address),
       data      : calldata.from_hex().unwrap(),
       value     : U256::from(0),
       gas       : U256::from("ffffffffffff"),
       gas_price : U256::from(0),
-      nonce     : nonce + U256::from(1 + i),
+      nonce     : create_nonce + U256::from(1 + i),
     }.sign(&account.secret(), None), None).unwrap();
   }
 
+  let fake_seal = vec![];
   client.import_sealed_block(
-    block.close_and_lock().seal(&*genesis.engine, vec![]).unwrap()
+    block.close_and_lock().seal(&*genesis.engine, fake_seal).unwrap()
   ).unwrap();
 
   println!("{}", json::Value::Array((0 .. std::env::args().len()).map(|i| {
@@ -88,7 +91,7 @@ fn main() {
         ethcore::client::BlockID::Pending, i
       ),
       ethcore::client::CallAnalytics {
-        transaction_tracing : true,  // Needed to detect crashes
+        transaction_tracing : true,
         vm_tracing          : false,
         state_diffing       : false,
       },
@@ -96,16 +99,38 @@ fn main() {
       ethcore::client::Executed { trace, logs, output, .. } => {
         let mut fields = json::Map::new();
 
-        fields.insert(
-          "success".to_string(),
+        fields.insert("output".to_string(), {
+          json::Value::String(output.to_hex())
+        });
+
+        fields.insert("success".to_string(), {
           json::Value::Bool(match trace[0].result {
             ethcore::trace::trace::Res::FailedCall(_) => false,
             _ => true,
-          }),
-        );
+          })
+        });
 
-        fields.insert(
-          "trace".to_string(),
+        fields.insert("logs".to_string(), {
+          json::Value::Array(logs.iter().map(|log| {
+            let mut fields = json::Map::new();
+
+            fields.insert("address".to_string(), {
+              json::Value::String(log.address.to_vec().to_hex())
+            });
+            fields.insert("data".to_string(), {
+              json::Value::String(log.data.to_hex())
+            });
+            fields.insert("topics".to_string(), {
+              json::Value::Array(log.topics.iter().map(|topic| {
+                json::Value::String(topic.to_vec().to_hex())
+              }).collect())
+            });
+
+            json::Value::Object(fields)
+          }).collect())
+        });
+
+        fields.insert("trace".to_string(), {
           json::Value::Array(trace.iter().map(|item| {
             let mut fields = json::Map::new();
 
@@ -131,6 +156,7 @@ fn main() {
                     json::Value::String(init.to_vec().to_hex())
                   });
                 }
+
                 ethcore::trace::trace::Action::Call(
                   ethcore::trace::trace::Call {
                     from, to, value, ref input, ref call_type, ..
@@ -155,6 +181,7 @@ fn main() {
                     json::Value::String(format!("{:?}", call_type))
                   });
                 }
+
                 ethcore::trace::trace::Action::Suicide(_) => {
                   fields.insert("type".to_string(), {
                     json::Value::String("suicide".to_string())
@@ -181,6 +208,7 @@ fn main() {
                     json::Value::String(code.to_vec().to_hex().to_string())
                   });
                 }
+
                 ethcore::trace::trace::Res::Call(
                   ethcore::trace::trace::CallResult { ref output, .. }
                 ) => {
@@ -188,16 +216,19 @@ fn main() {
                     json::Value::String(output.to_hex().to_string())
                   });
                 }
+
                 ethcore::trace::trace::Res::FailedCall(ref error) => {
                   fields.insert("error".to_string(), {
                     json::Value::String(format!("{:?}", error))
                   });
                 }
+
                 ethcore::trace::trace::Res::FailedCreate(ref error) => {
                   fields.insert("error".to_string(), {
                     json::Value::String(format!("{:?}", error))
                   });
                 }
+
                 ethcore::trace::trace::Res::None => {
                   fields.insert("error".to_string(), {
                     json::Value::String("(none)".to_string())
@@ -208,55 +239,28 @@ fn main() {
               json::Value::Object(fields)
             });
 
-            fields.insert(
-              "subtraces".to_string(),
-              json::Value::String(item.subtraces.to_string()),
-            );
+            fields.insert("subtraces".to_string(), {
+              json::Value::String(item.subtraces.to_string())
+            });
 
-            fields.insert(
-              "trace_address".to_string(),
-              json::Value::Array(item.trace_address.iter().map(
-                |x| json::Value::String(x.to_string())
-              ).collect()),
-            );
-
-            json::Value::Object(fields)
-          }).collect())
-        );
-
-        fields.insert(
-          "logs".to_string(),
-          json::Value::Array(logs.iter().map(|log| {
-            let mut fields = json::Map::new();
-
-            fields.insert(
-              "address".to_string(),
-              json::Value::String(log.address.to_vec().to_hex()),
-            );
-
-            fields.insert(
-              "topics".to_string(),
-              json::Value::Array(log.topics.iter().map(|topic| {
-                json::Value::String(topic.to_vec().to_hex())
+            fields.insert("trace_address".to_string(), {
+              json::Value::Array(item.trace_address.iter().map(|x| {
+                json::Value::String(x.to_string())
               }).collect())
-            );
-
-            fields.insert(
-              "data".to_string(),
-              json::Value::String(log.data.to_hex()),
-            );
+            });
 
             json::Value::Object(fields)
           }).collect())
-        );
-
-        fields.insert(
-          "output".to_string(),
-          json::Value::String(output.to_hex()),
-        );
+        });
 
         json::Value::Object(fields)
       }
     }
   }).collect()))
+}
+
+fn read_stdin() -> String {
+  let mut result = String::new();
+  std::io::stdin().read_to_string(&mut result).unwrap();
+  result
 }
