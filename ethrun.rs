@@ -105,8 +105,9 @@ fn main() {
 
         fields.insert("success".to_string(), {
           json::Value::Bool(match trace[0].result {
-            ethcore::trace::trace::Res::FailedCall(_) => false,
-            _ => true,
+            ethcore::trace::trace::Res::Call(_) => true,
+            ethcore::trace::trace::Res::Create(_) => true,
+            _ => false,
           })
         });
 
