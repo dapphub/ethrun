@@ -1,6 +1,6 @@
 /// ethrun.rs -- directly run EVM bytecode
 
-// Copyright 2016  Nexus Development, LLC
+// Copyright 2016, 2017  Nexus Development, LLC
 
 // This program is free software: you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as
@@ -22,14 +22,13 @@ extern crate ethcore_util;
 extern crate ethkey;
 extern crate rustc_serialize;
 extern crate serde_json as json;
-// extern crate ethcore_rpc;
 
 use ethcore::client::BlockChainClient;
 use ethcore::client::MiningBlockChainClient;
 use ethcore_util::FromHex;
 use ethcore_util::U256;
 use rustc_serialize::hex::ToHex;
-use std::io::Read;
+use std::io::BufRead;
 use std::sync::Arc;
 
 fn main() {
@@ -57,17 +56,25 @@ fn main() {
     block_author, gas_range_target, extra_data
   );
 
-  let create_nonce = client.latest_nonce(&account.address());
-  let address = ethcore::contract_address(&account.address(), &create_nonce);
+  let nonce = client.latest_nonce(&account.address());
+  let input = std::io::stdin();
+  let lines: Vec<String> = input.lock().lines().map(|result| {
+    result.unwrap()
+  }).collect();
 
-  block.push_transaction(ethcore::transaction::Transaction {
-    action    : ethcore::transaction::Action::Create,
-    data      : read_stdin().from_hex().unwrap(),
-    value     : U256::from("ffffffffffffffffffffffff"),
-    gas       : U256::from("ffffffffffff"),
-    gas_price : U256::from(0),
-    nonce     : create_nonce,
-  }.sign(&account.secret(), None), None).unwrap();
+  for (i, line) in lines.iter().enumerate() {
+    block.push_transaction(ethcore::transaction::Transaction {
+      action    : ethcore::transaction::Action::Create,
+      data      : line.from_hex().unwrap(),
+      value     : U256::from("ffffffffffffffffffffffff"),
+      gas       : U256::from("ffffffffffff"),
+      gas_price : U256::from(0),
+      nonce     : nonce + U256::from(i),
+    }.sign(&account.secret(), None), None).unwrap();
+  }
+
+  let create_nonce = nonce + U256::from(lines.len());
+  let address = ethcore::contract_address(&account.address(), &create_nonce);
 
   for (i, calldata) in std::env::args().skip(1).enumerate() {
     block.push_transaction(ethcore::transaction::Transaction {
@@ -76,7 +83,7 @@ fn main() {
       value     : U256::from(0),
       gas       : U256::from("ffffffffffff"),
       gas_price : U256::from(0),
-      nonce     : create_nonce + U256::from(1 + i),
+      nonce     : nonce + U256::from(lines.len() + i),
     }.sign(&account.secret(), None), None).unwrap();
   }
 
@@ -96,7 +103,9 @@ fn main() {
         state_diffing       : false,
       },
     ).unwrap() {
-      ethcore::client::Executed { trace, logs, output, .. } => {
+      ethcore::client::Executed {
+        trace, logs, output, ..
+      } => {
         let mut fields = json::Map::new();
 
         fields.insert("output".to_string(), {
@@ -258,10 +267,4 @@ fn main() {
       }
     }
   }).collect()))
-}
-
-fn read_stdin() -> String {
-  let mut result = String::new();
-  std::io::stdin().read_to_string(&mut result).unwrap();
-  result
 }

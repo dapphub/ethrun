@@ -4,12 +4,12 @@ ETHRUN(1)               Nexus Development Tools                ETHRUN(1)
 NAME
 	ethrun - directly run EVM bytecode
 SYNOPSIS
-        echo <bytecode> | ethrun [<calldata>...]
+        { [echo <bytecode>;]... } | ethrun [<calldata>...]
 
 DESCRIPTION
-	Ethrun sets up a minimal Parity environment, deploys one
-	contract, sends zero or more transactions to it and then
-	prints the result to standard output as a JSON structure.
+	Ethrun sets up a minimal Parity environment, deploys one or
+	more contracts, sends zero or more transactions to the last
+	one and then prints the results to stdout in JSON format.
 
 OUTPUT
         Ethrun outputs a JSON array in which the outcome of each
@@ -32,8 +32,9 @@ OUTPUT
              }],
 	   }]
 
-	The first element of the array always represents the
-	transaction in which the contract is first deployed.
+	The first elements of the array represent the transactions by
+	which the contracts were deployed, and the remaining elements
+        represent the transactions sent to the last-deployed contract.
 
 INSTALLATION
 	Use `make link' to install from source:
@@ -46,4 +47,4 @@ SEE ALSO
 
 
 
-ETHRUN(1)                    December 2016                     ETHRUN(1)
+ETHRUN(1)                     January 2017                     ETHRUN(1)
