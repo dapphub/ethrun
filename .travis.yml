@@ -12,8 +12,7 @@ sudo: required
 os:
   - linux
   - osx
-services:
-  - docker
+script: cargo build --release
 before_deploy: "cp target/release/ethrun ethrun-${TRAVIS_TAG}-${TRAVIS_OS_NAME}"
 deploy:
   provider: releases
