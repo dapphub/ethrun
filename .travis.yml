@@ -8,7 +8,7 @@ matrix:
     - rust: nightly
 cache:
   cargo: true
-sudo: false
+sudo: required
 dist: trusty
 os:
   - linux
