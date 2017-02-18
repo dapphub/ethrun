@@ -4,7 +4,7 @@ rust:
   - beta
   - nightly
 matrix:
-  allow-failures:
+  allow_failures:
     - rust: nightly
 cache:
   cargo: true
