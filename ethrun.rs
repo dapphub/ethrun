@@ -1,6 +1,6 @@
 /// ethrun.rs -- directly run EVM bytecode
 
-// Copyright 2016  Nexus Development, LLC
+// Copyright (C) 2016, 2017  Nexus Development, LLC
 
 // This program is free software: you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as
@@ -22,7 +22,6 @@ extern crate ethcore_util;
 extern crate ethkey;
 extern crate rustc_serialize;
 extern crate serde_json as json;
-// extern crate ethcore_rpc;
 
 use ethcore::client::BlockChainClient;
 use ethcore::client::MiningBlockChainClient;
