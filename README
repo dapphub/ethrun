@@ -38,12 +38,12 @@ OUTPUT
 INSTALLATION
 	Use `make link' to install from source:
 
-	   git clone https://github.com/nexusdev/ethrun
+	   git clone https://github.com/dapphub/ethrun
 	   make link -C ethrun
 
 SEE ALSO
-	parity(1), ethabi(1), dapple-quicktest(1)
+	parity(1), ethabi(1), seth(1), dapp(1)
 
 
 
-ETHRUN(1)                    December 2016                     ETHRUN(1)
+ETHRUN(1)                      April 2017                      ETHRUN(1)
