@@ -1,6 +1,6 @@
 /// ethrun.rs -- directly run EVM bytecode (using Parity)
 
-// Copyright (C) 2016  Mikael Brockman <mikael@dapphub.com>
+// Copyright (C) 2016, 2017  Mikael Brockman <mikael@dapphub.com>
 // Copyright (C) 2016, 2017  Daniel Brockman <daniel@dapphub.com>
 
 // This program is free software: you can redistribute it and/or
