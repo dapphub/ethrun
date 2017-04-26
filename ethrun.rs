@@ -1,6 +1,7 @@
-/// ethrun.rs -- directly run EVM bytecode
+/// ethrun.rs -- directly run EVM bytecode (using Parity)
 
-// Copyright 2016, 2017  Nexus Development, LLC
+// Copyright (C) 2016, 2017  Mikael Brockman <mikael@dapphub.com>
+// Copyright (C) 2016, 2017  Daniel Brockman <daniel@dapphub.com>
 
 // This program is free software: you can redistribute it and/or
 // modify it under the terms of the GNU General Public License as
