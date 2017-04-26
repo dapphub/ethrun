@@ -9,10 +9,10 @@ name = "ethrun"
 path = "ethrun.rs"
 
 [dependencies]
-ethcore          = { git = "https://github.com/mbrock/parity" }
-ethcore-devtools = { git = "https://github.com/mbrock/parity" }
-ethcore-io       = { git = "https://github.com/mbrock/parity" }
-ethcore-util     = { git = "https://github.com/mbrock/parity" }
-ethkey           = { git = "https://github.com/mbrock/parity" }
+ethcore          = { git = "https://github.com/paritytech/parity" }
+ethcore-devtools = { git = "https://github.com/paritytech/parity" }
+ethcore-io       = { git = "https://github.com/paritytech/parity" }
+ethcore-util     = { git = "https://github.com/paritytech/parity" }
+ethkey           = { git = "https://github.com/paritytech/parity" }
 rustc-serialize  = "0.3"
 serde_json       = "0.8"
