@@ -1,6 +1,6 @@
 [root]
 name = "ethrun"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ethcore 1.5.0 (git+https://github.com/paritytech/parity)",
  "ethcore-devtools 1.4.0 (git+https://github.com/paritytech/parity)",
