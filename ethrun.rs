@@ -74,7 +74,7 @@ fn main() {
     }.sign(&account.secret(), None), None).unwrap();
   }
 
-  let create_nonce = nonce + U256::from(lines.len());
+  let create_nonce = nonce + U256::from(lines.len() - 1);
   let address = ethcore::contract_address(&account.address(), &create_nonce);
 
   for (i, calldata) in std::env::args().skip(1).enumerate() {
