@@ -64,10 +64,17 @@ fn main() {
   }).collect();
 
   for (i, line) in lines.iter().enumerate() {
+    // only send value to the test runner
+    let value = if i == lines.len() - 1 {
+      "ffffffffffffffffffffffff"
+    } else {
+      "000000000000000000000000"
+    };
+
     block.push_transaction(ethcore::transaction::Transaction {
       action    : ethcore::transaction::Action::Create,
       data      : line.from_hex().unwrap(),
-      value     : U256::from("ffffffffffffffffffffffff"),
+      value     : U256::from(value),
       gas       : U256::from("ffffffffffff"),
       gas_price : U256::from(0),
       nonce     : nonce + U256::from(i),
