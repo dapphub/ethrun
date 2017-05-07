@@ -103,7 +103,7 @@ fn main() {
   let ntransactions = std::env::args().skip(1).len() + lines.len();
 
   println!("{}", json::Value::Array((0 .. ntransactions).map(|i| {
-    match client.replay(
+    let replay = client.replay(
       ethcore::client::TransactionID::Location(
         ethcore::client::BlockID::Pending, i
       ),
@@ -112,10 +112,10 @@ fn main() {
         vm_tracing          : false,
         state_diffing       : false,
       },
-    ).unwrap() {
-      ethcore::client::Executed {
-        trace, logs, output, ..
-      } => {
+    );
+
+    match replay {
+      Ok(ethcore::client::Executed { trace, logs, output, .. }) => {
         let mut fields = json::Map::new();
 
         fields.insert("output".to_string(), {
@@ -274,6 +274,9 @@ fn main() {
         });
 
         json::Value::Object(fields)
+      },
+      Err(..) => {
+        json::Value::String(replay.unwrap_err().to_string())
       }
     }
   }).collect()))
