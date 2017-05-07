@@ -100,7 +100,9 @@ fn main() {
     block.close_and_lock().seal(&*genesis.engine, fake_seal).unwrap()
   ).unwrap();
 
-  println!("{}", json::Value::Array((0 .. std::env::args().len()).map(|i| {
+  let ntransactions = std::env::args().skip(1).len() + lines.len();
+
+  println!("{}", json::Value::Array((0 .. ntransactions).map(|i| {
     match client.replay(
       ethcore::client::TransactionID::Location(
         ethcore::client::BlockID::Pending, i
