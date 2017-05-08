@@ -1,10 +1,12 @@
 language: rust
 rust:
+  - 1.16.0
   - stable
   - beta
   - nightly
 matrix:
   allow_failures:
+    - rust: stable
     - rust: nightly
     - rust: beta
 cache:
@@ -24,5 +26,5 @@ deploy:
   file: "ethrun-${TRAVIS_TAG}-${TRAVIS_OS_NAME}.tar.gz"
   skip_cleanup: true
   on:
-    rust: stable
+    rust: 1.16.0
     tags: true
