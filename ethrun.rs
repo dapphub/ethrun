@@ -64,10 +64,17 @@ fn main() {
   }).collect();
 
   for (i, line) in lines.iter().enumerate() {
+    // only send value to the test runner
+    let value = if i == lines.len() - 1 {
+      "ffffffffffffffffffffffff"
+    } else {
+      "000000000000000000000000"
+    };
+
     block.push_transaction(ethcore::transaction::Transaction {
       action    : ethcore::transaction::Action::Create,
       data      : line.from_hex().unwrap(),
-      value     : U256::from("ffffffffffffffffffffffff"),
+      value     : U256::from(value),
       gas       : U256::from("ffffffffffff"),
       gas_price : U256::from(0),
       nonce     : nonce + U256::from(i),
@@ -93,8 +100,10 @@ fn main() {
     block.close_and_lock().seal(&*genesis.engine, fake_seal).unwrap()
   ).unwrap();
 
-  println!("{}", json::Value::Array((0 .. std::env::args().len()).map(|i| {
-    match client.replay(
+  let ntransactions = std::env::args().skip(1).len() + lines.len();
+
+  println!("{}", json::Value::Array((0 .. ntransactions).map(|i| {
+    let replay = client.replay(
       ethcore::client::TransactionID::Location(
         ethcore::client::BlockID::Pending, i
       ),
@@ -103,10 +112,10 @@ fn main() {
         vm_tracing          : false,
         state_diffing       : false,
       },
-    ).unwrap() {
-      ethcore::client::Executed {
-        trace, logs, output, ..
-      } => {
+    );
+
+    match replay {
+      Ok(ethcore::client::Executed { trace, logs, output, .. }) => {
         let mut fields = json::Map::new();
 
         fields.insert("output".to_string(), {
@@ -265,6 +274,9 @@ fn main() {
         });
 
         json::Value::Object(fields)
+      },
+      Err(..) => {
+        json::Value::String(replay.unwrap_err().to_string())
       }
     }
   }).collect()))
