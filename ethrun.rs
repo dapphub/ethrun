@@ -26,8 +26,8 @@ extern crate serde_json as json;
 
 use ethcore::client::BlockChainClient;
 use ethcore::client::MiningBlockChainClient;
-use ethcore_util::FromHex;
 use ethcore_util::U256;
+use rustc_serialize::hex::FromHex;
 use rustc_serialize::hex::ToHex;
 use std::io::BufRead;
 use std::sync::Arc;
@@ -41,13 +41,17 @@ fn main() {
 
   genesis.gas_limit = U256::from("ffffffffffffffffffff");
 
+  let db = Arc::new(
+      ethcore_util::Database::open(
+          &ethcore_util::DatabaseConfig::with_columns(ethcore::db::NUM_COLUMNS),
+          &ethcore_devtools::RandomTempPath::new().as_str()).unwrap());
+
   let client = ethcore::client::Client::new(
     ethcore::client::ClientConfig::default(),
     &genesis,
-    &ethcore_devtools::RandomTempPath::new().as_path(),
+    db,
     Arc::new(ethcore::miner::Miner::with_spec(&genesis)),
     ethcore_io::IoChannel::disconnected(),
-    &ethcore_util::DatabaseConfig::with_columns(ethcore::db::NUM_COLUMNS),
   ).unwrap();
 
   let block_author = account.address();
@@ -82,11 +86,15 @@ fn main() {
   }
 
   let create_nonce = nonce + U256::from(lines.len() - 1);
-  let address = ethcore::contract_address(&account.address(), &create_nonce);
-
+  let address = ethcore::contract_address(
+      ethcore::CreateContractAddress::FromSenderAndNonce,
+      &account.address(),
+      &create_nonce,
+      &[]);
+  
   for (i, calldata) in std::env::args().skip(1).enumerate() {
     block.push_transaction(ethcore::transaction::Transaction {
-      action    : ethcore::transaction::Action::Call(address),
+      action    : ethcore::transaction::Action::Call(address.0),
       data      : calldata.from_hex().unwrap(),
       value     : U256::from(0),
       gas       : U256::from("ffffffffffff"),
@@ -104,8 +112,8 @@ fn main() {
 
   println!("{}", json::Value::Array((0 .. ntransactions).map(|i| {
     let replay = client.replay(
-      ethcore::client::TransactionID::Location(
-        ethcore::client::BlockID::Pending, i
+      ethcore::client::TransactionId::Location(
+        ethcore::client::BlockId::Pending, i
       ),
       ethcore::client::CallAnalytics {
         transaction_tracing : true,
